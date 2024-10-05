@@ -1,9 +1,12 @@
+from mysql.connector.abstracts import MySQLCursorAbstract
 import streamlit as st
 import mysql.connector
 from mysql.connector import Error
 from datetime import datetime
+import time
 
-# Initialize the MySQL connection with pooling
+# Initialize the MySQL connection with connection pooling
+# @st.cache_resource
 def create_connection():
     try:
         connection = mysql.connector.connect(
@@ -11,158 +14,184 @@ def create_connection():
             user='root',
             password='ru15070610',
             database='railway_reservation_management',
-            pool_size=5  
+            # pool_size=5  # Connection pool for scalability
         )
         return connection
     except Error as e:
         st.error(f"Error connecting to MySQL: {e}")
         return None
 
-# Streamlit sidebar for navigation
-st.sidebar.title("Railway Reservation System")
-page = st.sidebar.selectbox("Navigate", ["Passenger Management", "Reservation Management", "Train Management", "Station Management"])
+# Fetch stations for dropdown
+@st.cache_data(ttl=600)
+def fetch_stations():
+    conn = create_connection()
+    if conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT station_id, station_name FROM stations")
+        stations = cursor.fetchall()
+        conn.close()
+        return stations
+    return []
 
-# Passenger Management
-if page == "Passenger Management":
-    st.title("Passenger Management")
+# Fetch trains for dropdown
+@st.cache_data(ttl=600)
+def fetch_trains():
+    conn = create_connection()
+    if conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT train_id, train_name FROM trains")
+        trains = cursor.fetchall()
+        conn.close()
+        return trains
+    return []
+
+# Fetch passengers for dropdown
+@st.cache_data(ttl=600)
+def fetch_passengers():
+    conn = create_connection()
+    if conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT passenger_id, CONCAT(first_name, ' ', last_name) AS full_name FROM passengers")
+        passengers = cursor.fetchall()
+        conn.close()
+        return passengers
+    return []
+
+# Streamlit UI Layout
+st.title("🚆 Railway Reservation Management System")
+
+st.sidebar.title(body="Navigation")
+page = st.sidebar.radio(label="Select a page", options=["📋 Passenger Info", "📑 Train Info", "🏙️ Station Info", "🎟️ Book Reservation"])
+
+# Passenger Info Page
+if page == "📋 Passenger Info":
+    st.subheader("Passenger Information")
     
-    def add_passenger():
-        st.subheader("Add New Passenger")
-        first_name = st.text_input("First Name")
-        last_name = st.text_input("Last Name")
-        gender = st.selectbox("Gender", ["Male", "Female", "Other"])
-        age = st.number_input("Age", min_value=1, max_value=100)
-        mobile_no = st.text_input("Mobile No")
-        aadhar_no = st.text_input("Aadhar No")
-        email = st.text_input("Email")
+    passengers = fetch_passengers()
+    selected_passenger_id = None
+    if passengers:
+        selected_passenger_id = st.selectbox("Select Passenger", [f"{p[1]} (ID: {p[0]})" for p in passengers])
+    else:
+        st.warning("No passengers available.")
 
-        if st.button("Add Passenger"):
-            conn = create_connection()
-            if conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO passengers (first_name, last_name, gender, age, mobile_no, aadhar_no, email)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (first_name, last_name, gender, age, mobile_no, aadhar_no, email))
-                conn.commit()
-                conn.close()
-                st.success("Passenger added successfully!")
-
-    def view_passengers():
-        st.subheader("View Passengers")
+    if selected_passenger_id:
+        passenger_id = int(selected_passenger_id.split("(ID:")[1].split(")")[0])
         conn = create_connection()
         if conn:
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT * FROM passengers")
-            data = cursor.fetchall()
-            if data:
-                st.table(data)
-            else:
-                st.warning("No passengers found.")
+            cursor: MySQLCursorAbstract  = conn.cursor()
+            cursor.execute(f"SELECT * FROM passengers WHERE passenger_id = {passenger_id}")
+            passenger_data = cursor.fetchone()
+            print(passenger_data)
+            # passenger_data = (1, 'Rutvik', '', 'Male', 1, '', '58978945634', '', datetime.datetime(2024, 10, 5, 16, 27, 55))
+            if passenger_data:
+                st.markdown(f"""
+        **Passenger Details:**
+        - **Name**: {passenger_data[1]} {passenger_data[2]}
+        - **Gender**: {passenger_data[3]}
+        - **Age**: {passenger_data[4]}
+        - **Mobile**: {passenger_data[6]}
+        - **Aadhar No**: {passenger_data[5]}
+        - **Email**: {passenger_data[7]}
+                """)
             conn.close()
 
-    # UI Options
-    action = st.radio("Action", ["Add Passenger", "View Passengers"])
-    if action == "Add Passenger":
-        add_passenger()
-    elif action == "View Passengers":
-        view_passengers()
+# Train Info Page
+if page == "📑 Train Info":
+    st.subheader("Train Information")
+    
+    trains = fetch_trains()
 
-# Reservation Management
-if page == "Reservation Management":
-    st.title("Reservation Management")
+    if trains:
+        selected_train_id = st.selectbox("Select Train", [f"{t[1]} (ID: {t[0]})" for t in trains])
+    else:
+        st.warning("No trains available.")
 
-    def book_reservation():
-        st.subheader("Book Reservation")
-        passenger_id = st.text_input("Passenger ID")
-        train_id = st.text_input("Train ID")
-        start_station = st.text_input("Start Station")
-        destination_station = st.text_input("Destination Station")
-        journey_date = st.date_input("Journey Date")
+    if selected_train_id:
+        train_id = int(selected_train_id.split("(ID:")[1].split(")")[0])
+        conn = create_connection()
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT * FROM trains WHERE train_id = {train_id}")
+            train_data = cursor.fetchone()
+            print(train_data)
+            # (1, '12707', 'Hamsafar express', 'Superfast', 'Ranipat', 'Pune', datetime.timedelta(seconds=59340), datetime.timedelta(seconds=59340), 256, 1, datetime.datetime(2024, 10, 5, 16, 30, 37))
+            if train_data:
+                st.markdown(f"""
+                **Train Details:**
+                - **Train Name**: {train_data[2]}
+                - **Train Number**: {train_data[1]}
+                - **Type**: {train_data[3]}
+                - **Start Station**: {train_data[4]}
+                - **End Station**: {train_data[5]}
+                - **Departure Time**: {train_data[6]}
+                - **Arrival Time**: {train_data[7]}
+                - **Total Seats**: {train_data[8]}
+                - **Available Seats**: {train_data[9]}
+                """)
+            conn.close()
+
+# Station Info Page
+if page == "🏙️ Station Info":
+    st.subheader("Station Information")
+
+    stations = fetch_stations()
+
+    if stations:
+        selected_station_id = st.selectbox("Select Station", [f"{s[1]} (ID: {s[0]})" for s in stations])
+    else:
+        st.warning("No stations available.")
+
+    if selected_station_id:
+        station_id = int(selected_station_id.split("(ID:")[1].split(")")[0])
+        conn = create_connection()
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT * FROM stations WHERE station_id = {station_id}")
+            station_data = cursor.fetchone()
+            print(station_data)
+            # station_data = (1, '420', 'nashik', datetime.datetime(2024, 10, 5, 16, 29, 28))
+            if station_data:
+                st.markdown(f"""
+        **Station Details:**
+        - **Station Name**: {station_data[2]}
+        - **Station Code**: {station_data[1]}
+                """)
+            conn.close()
+
+# Book Reservation Page
+if page == "🎟️ Book Reservation":
+    st.subheader("Book a Reservation")
+
+    passengers = fetch_passengers()
+    trains = fetch_trains()
+    stations = fetch_stations()
+
+    if passengers and trains and stations:
+        selected_passenger_id = st.selectbox("Select Passenger", [f"{p[1]} (ID: {p[0]})" for p in passengers])
+        selected_train_id = st.selectbox("Select Train", [f"{t[1]} (ID: {t[0]})" for t in trains])
+        selected_start_station = st.selectbox("Select Start Station", [f"{s[1]} (ID: {s[0]})" for s in stations])
+        selected_dest_station = st.selectbox("Select Destination Station", [f"{s[1]} (ID: {s[0]})" for s in stations])
+        journey_date = st.date_input("Journey Date", datetime.today())
         price = st.number_input("Price", min_value=0.0)
 
         if st.button("Book Reservation"):
-            conn = create_connection()
-            if conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO reservations (passenger_id, train_id, train_start_station_id, destination_station_id, journey_date, price)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """, (passenger_id, train_id, start_station, destination_station, journey_date, price))
-                conn.commit()
-                conn.close()
-                st.success("Reservation booked successfully!")
+            with st.spinner("Booking your reservation..."):
+                time.sleep(1)  # Simulate processing time
+                conn = create_connection()
+                if conn:
+                    cursor = conn.cursor()
+                    passenger_id = int(selected_passenger_id.split("(ID:")[1].split(")")[0])
+                    train_id = int(selected_train_id.split("(ID:")[1].split(")")[0])
+                    start_station_id = int(selected_start_station.split("(ID:")[1].split(")")[0])
+                    dest_station_id = int(selected_dest_station.split("(ID:")[1].split(")")[0])
 
-    def view_reservations():
-        st.subheader("View Reservations")
-        conn = create_connection()
-        if conn:
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT * FROM reservations")
-            data = cursor.fetchall()
-            if data:
-                st.table(data)
-            else:
-                st.warning("No reservations found.")
-            conn.close()
+                    cursor.execute("""
+                        INSERT INTO reservations (passenger_id, train_id, train_start_station_id, destination_station_id, journey_date, price)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (passenger_id, train_id, start_station_id, dest_station_id, journey_date, price))
+                    conn.commit()
+                    conn.close()
 
-    # UI Options
-    action = st.radio("Action", ["Book Reservation", "View Reservations"])
-    if action == "Book Reservation":
-        book_reservation()
-    elif action == "View Reservations":
-        view_reservations()
-
-# Train Management
-if page == "Train Management":
-    st.title("Train Management")
-
-    def add_train():
-        st.subheader("Add New Train")
-        train_no = st.text_input("Train Number")
-        train_name = st.text_input("Train Name")
-        train_type = st.selectbox("Train Type", ["Passenger", "Express", "Superfast"])
-        start_station = st.text_input("Start Station")
-        end_station = st.text_input("End Station")
-        departure_time = st.time_input("Departure Time")
-        arrival_time = st.time_input("Arrival Time")
-        total_seats = st.number_input("Total Seats", min_value=1)
-        available_seats = st.number_input("Available Seats", min_value=1)
-
-        if st.button("Add Train"):
-            conn = create_connection()
-            if conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO trains (train_no, train_name, train_type, start_station, end_station, departure_time, arrival_time, total_seats, available_seats)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (train_no, train_name, train_type, start_station, end_station, departure_time, arrival_time, total_seats, available_seats))
-                conn.commit()
-                conn.close()
-                st.success("Train added successfully!")
-
-    # UI Options
-    add_train()
-
-# Station Management
-if page == "Station Management":
-    st.title("Station Management")
-    
-    def add_station():
-        st.subheader("Add New Station")
-        station_code = st.text_input("Station Code")
-        station_name = st.text_input("Station Name")
-
-        if st.button("Add Station"):
-            conn = create_connection()
-            if conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO stations (station_code, station_name)
-                    VALUES (%s, %s)
-                """, (station_code, station_name))
-                conn.commit()
-                conn.close()
-                st.success("Station added successfully!")
-
-    add_station()
+                    st.success("Reservation successfully booked!")
+    else:
+        st.warning("Unable to book reservation. Please ensure passengers, trains, and stations are available.")

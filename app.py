@@ -20,7 +20,7 @@ def create_connection():
         return None
 
 # Fetch data from MySQL
-@st.cache_data(ttl=600)
+# @st.cache_data(ttl=600)
 def fetch_data(query):
     conn = create_connection()
     if conn:
@@ -82,8 +82,10 @@ def add_passenger():
         email = st.text_input("Email")
         
         if st.form_submit_button("Add Passenger"):
-            add_entity(entity="passengers", columns=["first_name", "last_name", "gender", "age", "aadhar", "mobile", "email"], 
-                       values=[first_name, last_name, gender, age, aadhar, mobile, email])
+            # print("Record done : ")
+            # print(first_name, last_name, gender, age, aadhar, mobile, email)
+            
+            add_entity(entity="passengers",     columns=["first_name", "last_name", "gender", "age", "aadhar_no", "mobile_no", "email"] , values=[first_name, last_name, gender, age, aadhar, mobile, email])
 
 # Train Information Page
 def train_info():
@@ -130,8 +132,10 @@ def add_train():
         available_seats = st.number_input("Available Seats", min_value=0)
         
         if st.form_submit_button("Add Train"):
-            add_entity("trains", ["train_name", "train_number", "type", "start_station", "end_station", "departure_time", "arrival_time", "total_seats", "available_seats"],
-                       [train_name, train_number, train_type, start_station, end_station, departure_time, arrival_time, total_seats, available_seats])
+            add_entity(entity="trains", 
+                columns=["train_name", "train_no", "train_type", "start_station", "end_station", "departure_time", "arrival_time", "total_seats", "available_seats"],
+                values=[train_name, train_number, train_type, start_station, end_station, departure_time, arrival_time, total_seats, available_seats]
+            )
 
 # Station Information Page
 def station_info():

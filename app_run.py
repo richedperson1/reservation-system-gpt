@@ -31,59 +31,6 @@ def get_db_connection():
         st.stop()
 
 
-def doing_noting():
-    # Insert Passenger
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
-    print("adding data in the passenger tables")
-    cursor.execute("""
-        INSERT INTO passengers (first_name, last_name, gender, age, mobile_no, aadhar_no, email)
-        VALUES (%(first_name)s, %(last_name)s, %(gender)s, %(age)s, %(mobile_no)s, %(aadhar_no)s, %(email)s)
-    """, passenger_data)
-    conn.commit()
-    passenger_id = cursor.lastrowid
-
-    # Book Seat
-    cursor.execute("""
-        SELECT seat_id
-        FROM seats
-        WHERE train_id = %s AND class_id = %s AND availability_status = 'Available'
-        LIMIT 1
-    """, (selected_train_id, class_id))
-    seat = cursor.fetchone()
-    seat_id = seat['seat_id']
-
-    cursor.execute("""
-        UPDATE seats
-        SET availability_status = 'Booked', reservation_id = NULL  -- Will be updated after reservation
-        WHERE seat_id = %s
-    """, (seat_id,))
-    conn.commit()
-
-    # Create Reservation
-    reservation_no = f"RES{hashlib.sha256(str(datetime.now()).encode()).hexdigest()[:10]}"
-    cursor.execute("""
-        INSERT INTO reservations
-        (passenger_id, train_id, class_id, reservation_no, train_start_station_id, destination_station_id, reservation_date, journey_date, fare_id)
-        VALUES (%s, %s, %s, %s, %s, %s, CURDATE(), %s, (SELECT fare_id FROM fares WHERE train_id = %s AND class_id = %s AND start_station_id = %s AND end_station_id = %s))
-    """, (passenger_id, selected_train_id, class_id, reservation_no, start_station_id, destination_station_id, journey_date, selected_train_id, class_id, start_station_id, destination_station_id))
-    conn.commit()
-    reservation_id = cursor.lastrowid
-
-    # Update seat with reservation_id
-    cursor.execute("""
-        UPDATE seats
-        SET reservation_id = %s
-        WHERE seat_id = %s
-    """, (reservation_id, seat_id))
-    conn.commit()
-
-    st.success(f"Reservation Successful! Your Reservation Number is {reservation_no}")
-
-                            # Optionally, display or email ticket details.
-
-# --- Main Application ---
-
 def main():
     st.set_page_config(page_title="Railway Reservation System", layout="wide")
     st.title("Railway Reservation Management System")

@@ -39,10 +39,10 @@ def main():
 
     # Database connection
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True)
 
     # Page Navigation
-    menu = ['Admin Panel','Home', 'Reserve Ticket']
+    menu = ['Reserve Ticket','Admin Panel','Home', ]
     choice = st.sidebar.selectbox('Navigation', menu)
 
     if choice == 'Home':
@@ -84,6 +84,7 @@ def main():
             submitted = st.form_submit_button("Check Availability")
 
         if submitted:
+            print("entering the submit path")
             # --- Processing Reservation ---
             passenger_data = {
                 'first_name': first_name.strip(),
@@ -134,13 +135,15 @@ def main():
                         WHERE train_id = %s AND class_id = %s AND start_station_id = %s AND end_station_id = %s
                     """, (selected_train_id, class_id, start_station_id, destination_station_id))
                     fare = cursor.fetchone()
-
+                    print("before fares : ")
                     if fare:
                         ticket_price = fare['price']
                         st.info(f"Ticket Price: ₹{ticket_price}")
+                        print("before confirmation : ")
 
                         if st.button("Confirm Reservation"):
                             # Insert Passenger
+                            print("adding data in the passenger tables")
                             cursor.execute("""
                                 INSERT INTO passengers (first_name, last_name, gender, age, mobile_no, aadhar_no, email)
                                 VALUES (%(first_name)s, %(last_name)s, %(gender)s, %(age)s, %(mobile_no)s, %(aadhar_no)s, %(email)s)
@@ -222,6 +225,7 @@ def main():
                     st.success(f"Train {train_name} added successfully.")
             elif admin_choice == "View Available Tickets":
                 view_available_tickets(st)
+
             elif admin_choice == "View Reservations":
                 view_reservations(st=st)
             elif admin_choice == "Increase Seats in Train":

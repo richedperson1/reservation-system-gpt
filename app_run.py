@@ -202,7 +202,7 @@ def main():
         if authentication_status:
             st.success("Admin authenticated successfully.")
 
-            admin_menu: list[str] = ["Add Train", "Add Station", "Add Ticket Class", "Add Train Route", "View Available Tickets", "View Reservations", "Increase Seats in Train"]
+            admin_menu: list[str] = ["Add Train", "Add Station",  "Add Train Route", "View Available Tickets", "View Reservations", "Increase Seats in Train"]
             admin_choice = st.selectbox('Admin Options', admin_menu)
 
             if admin_choice == 'Add Train':

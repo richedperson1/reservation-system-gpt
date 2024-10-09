@@ -1,4 +1,5 @@
 from db import mysql_connection
+
 def view_available_tickets(st):
     st.header("View Available Tickets")
 

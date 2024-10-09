@@ -1,4 +1,5 @@
 from db import mysql_connection
+
 def increase_seats_in_train(st):
     st.header("Increase Seats in Train")
 

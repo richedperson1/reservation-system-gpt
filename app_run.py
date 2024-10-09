@@ -1,16 +1,17 @@
 import streamlit as st
 import mysql.connector
 # from mysql.connector import errorcode
-import pandas as pd
+# import pandas as pd
 import hashlib
 from datetime import datetime
+from db import fetch_one_operation,fetch_all_operation,commit_operation,commit_cursor_operation
 
 # The code you provided is a Python code snippet with a comment `# from admin import`. However, the
 # import statement is incomplete, as it does not specify what is being imported from the `admin`
 # module. To complete the import statement, you need to specify the module or object that you want to
 # import from the `admin` module. For example, if you want to import a specific function named
 # `my_function` from the `admin` module, the import statement should look like this:
-from admin import  add_route,view_available_tickets,view_reservations,increase_seats_in_train
+from admin import  add_route,view_available_tickets,view_reservations,increase_seats_in_train,fare_app
 
 
 # from authenticate import Authenticate  # Replace this with the actual location of Authenticate
@@ -39,10 +40,10 @@ def main():
 
     # Database connection
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True)
 
     # Page Navigation
-    menu = ['Admin Panel','Home', 'Reserve Ticket']
+    menu = ['Reserve Ticket','Admin Panel','Home']
     choice = st.sidebar.selectbox('Navigation', menu)
 
     if choice == 'Home':
@@ -77,6 +78,7 @@ def main():
 
             # Fetch Classes
             cursor.execute("SELECT class_id, class_name FROM classes")
+            
             classes = cursor.fetchall()
             class_options = {cls['class_name']: cls['class_id'] for cls in classes}
             selected_class_name = st.selectbox("Class", options=class_options.keys())
@@ -101,91 +103,117 @@ def main():
             destination_station_id = station_options[destination_station_name]
             class_id = class_options[selected_class_name]
 
-            # Fetch Trains available between stations
-            cursor.execute("""
-                SELECT DISTINCT t.train_id, t.train_name
+            
+            query = """SELECT DISTINCT t.train_id, t.train_name
                 FROM trains t
                 JOIN routes r1 ON t.train_id = r1.train_id
                 JOIN routes r2 ON t.train_id = r2.train_id
                 WHERE r1.station_id = %s AND r2.station_id = %s AND r1.sequence < r2.sequence
-            """, (start_station_id, destination_station_id))
-            trains = cursor.fetchall()
+            """
+            trains = fetch_all_operation(query=query,value=(start_station_id, destination_station_id))
+            # Fetch Trains available between stations
+            # cursor.execute("""
+            #     SELECT DISTINCT t.train_id, t.train_name
+            #     FROM trains t
+            #     JOIN routes r1 ON t.train_id = r1.train_id
+            #     JOIN routes r2 ON t.train_id = r2.train_id
+            #     WHERE r1.station_id = %s AND r2.station_id = %s AND r1.sequence < r2.sequence
+            # """, (start_station_id, destination_station_id))
 
             if trains:
                 train_options = {train['train_name']: train['train_id'] for train in trains}
                 selected_train_name = st.selectbox("Available Trains", options=train_options.keys())
                 selected_train_id = train_options[selected_train_name]
 
-                # Check Seat Availability
-                cursor.execute("""
-                    SELECT COUNT(*) AS available_seats
+                query = """SELECT COUNT(*) AS available_seats
                     FROM seats
-                    WHERE train_id = %s AND class_id = %s AND availability_status = 'Available'
-                """, (selected_train_id, class_id))
-                seat_availability = cursor.fetchone()['available_seats']
-
-                if seat_availability > 0:
+                    WHERE train_id = %s AND class_id = %s AND availability_status = 'Available'"""
+                # Check Seat Availability
+                value =  (selected_train_id, class_id)
+                
+                seat_availability = fetch_one_operation(query=query,value=value)
+                if not seat_availability:
+                    st.error("Not able to book the tickets ")
+                else:    
+                    seat_availability = seat_availability['available_seats']
+                print("seat_availability :====> ",seat_availability)
+                if seat_availability and seat_availability > 0:
                     st.success(f"Seats Available: {seat_availability}")
 
-                    # Fetch Fare
-                    cursor.execute("""
+                    query = """
                         SELECT price
                         FROM fares
                         WHERE train_id = %s AND class_id = %s AND start_station_id = %s AND end_station_id = %s
-                    """, (selected_train_id, class_id, start_station_id, destination_station_id))
-                    fare = cursor.fetchone()
+                    """
+                    values = (selected_train_id, class_id, start_station_id, destination_station_id)
+                    fare = fetch_one_operation(query=query,value=values)
 
                     if fare:
                         ticket_price = fare['price']
                         st.info(f"Ticket Price: ₹{ticket_price}")
 
-                        if st.button("Confirm Reservation"):
-                            # Insert Passenger
-                            cursor.execute("""
+                        if True:
+                            query = """
                                 INSERT INTO passengers (first_name, last_name, gender, age, mobile_no, aadhar_no, email)
                                 VALUES (%(first_name)s, %(last_name)s, %(gender)s, %(age)s, %(mobile_no)s, %(aadhar_no)s, %(email)s)
-                            """, passenger_data)
-                            conn.commit()
+                            """
+                            values = passenger_data
+                            cursor,conn = commit_cursor_operation(query=query,value=values)
+                            
+                            # conn.commit()
                             passenger_id = cursor.lastrowid
+                            cursor.close()
+                            conn.close()
 
-                            # Book Seat
-                            cursor.execute("""
+                            query = """
                                 SELECT seat_id
                                 FROM seats
                                 WHERE train_id = %s AND class_id = %s AND availability_status = 'Available'
                                 LIMIT 1
-                            """, (selected_train_id, class_id))
-                            seat = cursor.fetchone()
-                            seat_id = seat['seat_id']
+                            """
+                            values = (selected_train_id, class_id)
+                            
+                            seat = fetch_one_operation( query=query,value=values)
 
-                            cursor.execute("""
+                            seat_id = seat['seat_id']
+                            
+                            query = """
                                 UPDATE seats
                                 SET availability_status = 'Booked', reservation_id = NULL  -- Will be updated after reservation
                                 WHERE seat_id = %s
-                            """, (seat_id,))
-                            conn.commit()
+                            """
+                            value = (seat_id,)
+                            
+                            commit_operation(query=query,value=value)
+
 
                             # Create Reservation
                             reservation_no = f"RES{hashlib.sha256(str(datetime.now()).encode()).hexdigest()[:10]}"
-                            cursor.execute("""
+                            
+                            query = """
                                 INSERT INTO reservations
                                 (passenger_id, train_id, class_id, reservation_no, train_start_station_id, destination_station_id, reservation_date, journey_date, fare_id)
                                 VALUES (%s, %s, %s, %s, %s, %s, CURDATE(), %s, (SELECT fare_id FROM fares WHERE train_id = %s AND class_id = %s AND start_station_id = %s AND end_station_id = %s))
-                            """, (passenger_id, selected_train_id, class_id, reservation_no, start_station_id, destination_station_id, journey_date, selected_train_id, class_id, start_station_id, destination_station_id))
-                            conn.commit()
-                            reservation_id = cursor.lastrowid
+                            """
+                            values = (passenger_id, selected_train_id, class_id, reservation_no, start_station_id, destination_station_id, journey_date, selected_train_id, class_id, start_station_id, destination_station_id)
+                            
+                            cursor,conn = commit_cursor_operation(query=query,value=values)
 
-                            # Update seat with reservation_id
-                            cursor.execute("""
+                            reservation_id = cursor.lastrowid
+                            conn.close()
+                            cursor.close()
+                            
+                            query = """
                                 UPDATE seats
                                 SET reservation_id = %s
                                 WHERE seat_id = %s
-                            """, (reservation_id, seat_id))
-                            conn.commit()
+                            """
+                            
+                            values = (reservation_id, seat_id)
+                            
+                            commit_operation(query=query,value=values)
 
                             st.success(f"Reservation Successful! Your Reservation Number is {reservation_no}")
-
-                            # Optionally, display or email ticket details.
 
                     else:
                         st.error("Ticket fare information is not available for the selected route.")
@@ -202,7 +230,7 @@ def main():
         if authentication_status:
             st.success("Admin authenticated successfully.")
 
-            admin_menu: list[str] = ["Add Train", "Add Station", "Add Ticket Class", "Add Train Route", "View Available Tickets", "View Reservations", "Increase Seats in Train"]
+            admin_menu: list[str] = ["Add Train", "Add Station", "Add Ticket Class", "Add Train Route", "Add Seats in train","View Available Tickets", "View Reservations", "Fare Operation"]
             admin_choice = st.selectbox('Admin Options', admin_menu)
 
             if admin_choice == 'Add Train':
@@ -224,8 +252,13 @@ def main():
                 view_available_tickets(st)
             elif admin_choice == "View Reservations":
                 view_reservations(st=st)
-            elif admin_choice == "Increase Seats in Train":
+                
+            elif admin_choice == "Add Seats in train":
                 increase_seats_in_train(st)
+                
+            elif admin_choice == "Fare Operation":
+                fare_app(st)
+                
             elif admin_choice== "Add Train Route":
                 add_route(st=st)
             elif admin_choice == 'Add Station':

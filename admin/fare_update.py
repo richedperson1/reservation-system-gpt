@@ -108,26 +108,28 @@ def fare_app(st):
         st.header("Update Existing Fare")
 
         # Create a list of fares with readable labels
-        fare_options = [
-            f"ID {fare[0]} : {fare[1]} - {fare[2]} Class from {fare[3]} to {fare[4]} (Price: {fare[5]})"
-            for fare in fares
-        ]
-        selected_fare = st.selectbox("Select Fare to Update", fare_options)
-        
+        try:
+            fare_options = [
+                f"ID {fare[0]} : {fare[1]} - {fare[2]} Class from {fare[3]} to {fare[4]} (Price: {fare[5]})"
+                for fare in fares
+            ]
+            selected_fare = st.selectbox("Select Fare to Update", fare_options)
+            
 
-        fare_id = int(selected_fare.split()[1])
+            fare_id = int(selected_fare.split()[1])
 
-        # Fetch the current price
-        current_price = next(fare[5] for fare in fares if fare[0] == fare_id)
+            # Fetch the current price
+            current_price = next(fare[5] for fare in fares if fare[0] == fare_id)
 
-        # Price input
-        new_price = st.number_input("Enter New Fare Price", min_value=0.0, value=float(current_price), format="%.2f")
+            # Price input
+            new_price = st.number_input("Enter New Fare Price", min_value=0.0, value=float(current_price), format="%.2f")
 
-        # Button to submit
-        if st.button("Update Fare"):
-            update_fare(conn, fare_id, new_price)
-            st.success("Fare updated successfully!")
-
+            # Button to submit
+            if st.button("Update Fare"):
+                update_fare(conn, fare_id, new_price)
+                st.success("Fare updated successfully!")
+        except Exception as err:
+            st.error(f"Error occured due to : {err}",icon="🚨")
     conn.close()
 
 

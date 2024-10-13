@@ -10,17 +10,6 @@ class mysql_connection:
         
         return _INSTANCE
     
-def get_db_connection():
-    try:
-        connection = mysql.connector.connect(
-            host="localhost",
-        user="root",
-        password="ru15070610",
-        database="railway_reservation_management_price"
-        )
-        return connection
-    except mysql.connector.Error as err:
-        print(err)
 
 def fetch_all_operation(query,value):
     

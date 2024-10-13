@@ -11,8 +11,7 @@ from db import fetch_one_operation,fetch_all_operation,commit_operation,commit_c
 # module. To complete the import statement, you need to specify the module or object that you want to
 # import from the `admin` module. For example, if you want to import a specific function named
 # `my_function` from the `admin` module, the import statement should look like this:
-from admin import  add_route,view_available_tickets,view_reservations,increase_seats_in_train,fare_app
-
+from admin import  add_route,view_available_tickets,view_reservations,increase_seats_in_train,fare_app,class_app,delete_op_app
 
 # from authenticate import Authenticate  # Replace this with the actual location of Authenticate
 
@@ -230,7 +229,7 @@ def main():
         if authentication_status:
             st.success("Admin authenticated successfully.")
 
-            admin_menu: list[str] = ["Add Train", "Add Station", "Add Ticket Class", "Add Train Route", "Add Seats in train","View Available Tickets", "View Reservations", "Fare Operation"]
+            admin_menu: list[str] = ["Add Train", "Add Station", "Add Ticket Class", "Add Train Route", "Add Seats in train","View Available Tickets", "View Reservations", "Fare Operation","delete operations"]
             admin_choice = st.selectbox('Admin Options', admin_menu)
 
             if admin_choice == 'Add Train':
@@ -248,6 +247,12 @@ def main():
                     """, (train_no, train_name, train_type, total_seats))
                     conn.commit()
                     st.success(f"Train {train_name} added successfully.")
+            
+            elif admin_choice =="Add Ticket Class":
+                 class_app(st)
+                 
+            elif admin_choice =="delete operations":
+                 delete_op_app(st)
             elif admin_choice == "View Available Tickets":
                 view_available_tickets(st)
             elif admin_choice == "View Reservations":

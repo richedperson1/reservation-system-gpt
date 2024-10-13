@@ -1,5 +1,6 @@
-*.sql
+
 *testing*
+*test.sql
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
